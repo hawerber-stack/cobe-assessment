@@ -12,19 +12,8 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        heading: ['Poppins', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            50: '#eef2ff',
-                            100: '#e0e7ff',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                            900: '#312e81',
-                        }
-                    }
+                    fontFamily: { sans: ['Inter', 'sans-serif'], heading: ['Poppins', 'sans-serif'] },
+                    colors: { brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 900: '#312e81' } }
                 }
             }
         }
@@ -91,25 +80,12 @@
                     </select>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                    <label id="dropzone1" class="upload-zone flex flex-col items-center justify-center w-full h-36 border-2 border-brand-200 border-dashed rounded-2xl cursor-pointer bg-slate-50">
-                        <div class="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
-                            <svg class="w-8 h-8 text-brand-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
-                            <p class="text-sm font-semibold text-slate-700" id="label1">Upload Q1 Audio</p>
-                            <p class="text-xs text-slate-500 mt-1">Click to browse (.webm)</p>
-                        </div>
-                        <input type="file" id="audio1" accept="audio/*" class="hidden" onchange="updateFileName('audio1', 'dropzone1', 'label1', 'Q1 Audio')">
-                    </label>
-
-                    <label id="dropzone2" class="upload-zone flex flex-col items-center justify-center w-full h-36 border-2 border-brand-200 border-dashed rounded-2xl cursor-pointer bg-slate-50">
-                        <div class="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
-                            <svg class="w-8 h-8 text-brand-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
-                            <p class="text-sm font-semibold text-slate-700" id="label2">Upload Q2 Audio</p>
-                            <p class="text-xs text-slate-500 mt-1">Click to browse (.webm)</p>
-                        </div>
-                        <input type="file" id="audio2" accept="audio/*" class="hidden" onchange="updateFileName('audio2', 'dropzone2', 'label2', 'Q2 Audio')">
-                    </label>
+                <div id="dynamicUploads" class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                    <div class="col-span-full text-center p-6 bg-slate-50 border border-slate-200 border-dashed rounded-xl text-slate-500">
+                        Select a Video Topic above to load the specific questions and audio upload boxes.
+                    </div>
                 </div>
+
             </div>
         </div>
 
@@ -120,7 +96,7 @@
             <div id="loadingIndicator" class="hidden flex flex-col items-center justify-center mt-8 bg-white/80 backdrop-blur py-4 px-6 rounded-2xl shadow-sm inline-block mx-auto max-w-sm">
                 <div class="spinner spinner-large mb-3"></div>
                 <p class="text-brand-900 font-semibold font-heading">AI is listening to the audio...</p>
-                <p class="text-slate-500 text-sm mt-1">Cross-referencing rubrics (approx. 30s)</p>
+                <p class="text-slate-500 text-sm mt-1">Cross-referencing rubrics (approx. 30-45s)</p>
             </div>
         </div>
 
@@ -148,8 +124,8 @@
     </script>
 
     <script>
-        // UI Function to update the file dropzones when a file is selected
-        function updateFileName(inputId, dropzoneId, labelId, defaultText) {
+        // Global UI Function for handling custom file upload styling
+        window.updateFileName = function(inputId, dropzoneId, labelId, defaultText) {
             const input = document.getElementById(inputId);
             const dropzone = document.getElementById(dropzoneId);
             const label = document.getElementById(labelId);
@@ -163,7 +139,7 @@
                 label.innerHTML = defaultText;
                 label.classList.replace('text-emerald-700', 'text-slate-700');
             }
-        }
+        };
     </script>
 
     <script type="module">
@@ -172,155 +148,27 @@
         let csvDataRows = [];
         let pdfBase64Data = "";
         let finalReportText = "";
+        let videosByLevel = { '4': new Set(), '5': new Set() };
+        let activeQuestions = [];
 
-        // AUTO-LOAD FILES FROM GITHUB SERVER
-        window.addEventListener('DOMContentLoaded', async () => {
-            const statusDiv = document.getElementById('systemStatus');
-            try {
-                const csvResponse = await fetch('questions.csv');
-                if (!csvResponse.ok) throw new Error("Could not find questions.csv");
-                const csvText = await csvResponse.text();
-                
-                Papa.parse(csvText, {
-                    complete: function(results) {
-                        csvDataRows = results.data;
-                        const select = document.getElementById('videoSelect');
-                        select.innerHTML = '';
-                        let videosFound = new Set();
-
-                        csvDataRows.forEach(row => {
-                            const videoName = row[0] ? row[0].trim() : '';
-                            if (videoName && videoName !== 'name of video' && videoName !== '016486 (4 points)') {
-                                videosFound.add(videoName);
-                            }
-                        });
-
-                        videosFound.forEach(vid => {
-                            const opt = document.createElement('option');
-                            opt.value = vid;
-                            opt.innerText = vid;
-                            select.appendChild(opt);
-                        });
-                        select.disabled = false;
-                    }
-                });
-
-                const pdfResponse = await fetch('rubric.pdf');
-                if (!pdfResponse.ok) throw new Error("Could not find rubric.pdf");
-                const pdfBlob = await pdfResponse.blob();
-                
-                const reader = new FileReader();
-                reader.readAsDataURL(pdfBlob);
-                reader.onloadend = () => {
-                    pdfBase64Data = reader.result.split(',')[1];
-                    
-                    statusDiv.className = "inline-flex items-center bg-emerald-50 text-emerald-700 px-5 py-2.5 rounded-full text-sm font-semibold shadow-sm border border-emerald-200 transition-colors duration-300";
-                    statusDiv.innerHTML = "✅ System Ready: Rubric & Questions Loaded";
-                    document.getElementById('assessBtn').disabled = false;
-                };
-
-            } catch (error) {
-                console.error(error);
-                statusDiv.className = "inline-flex items-center bg-red-50 text-red-700 px-5 py-2.5 rounded-full text-sm font-semibold shadow-sm border border-red-200 transition-colors duration-300";
-                statusDiv.innerHTML = "❌ Error: Could not load background files from server.";
-            }
-        });
-
-        function fileToGenerativePart(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve({ inlineData: { data: reader.result.split(',')[1], mimeType: file.type } });
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
+        // Helper: Populate Video Dropdown based on Level
+        function populateVideoDropdown(selectedLevel) {
+            const select = document.getElementById('videoSelect');
+            select.innerHTML = '<option value="">Select a video...</option>'; 
+            
+            const videosForLevel = videosByLevel[selectedLevel] || new Set();
+            videosForLevel.forEach(vid => {
+                const opt = document.createElement('option');
+                opt.value = vid;
+                opt.innerText = vid;
+                select.appendChild(opt);
             });
+            
+            select.disabled = (videosForLevel.size === 0);
+            document.getElementById('dynamicUploads').innerHTML = `<div class="col-span-full text-center p-6 bg-slate-50 border border-slate-200 border-dashed rounded-xl text-slate-500">Please select a video topic.</div>`;
+            activeQuestions = [];
         }
 
-        // MAIN AI LOGIC
-        document.getElementById('assessBtn').addEventListener('click', async () => {
-            const apiKey = document.getElementById('apiKey').value.trim();
-            const studentName = document.getElementById('studentName').value.trim() || "Student";
-            const level = document.getElementById('level').value;
-            const topic = document.getElementById('videoSelect').value;
-            const audio1 = document.getElementById('audio1').files[0];
-            const audio2 = document.getElementById('audio2').files[0];
-
-            if (!apiKey || !audio1 || !audio2) {
-                alert("Please provide your API Key and upload both student audio files.");
-                return;
-            }
-
-            const btn = document.getElementById('assessBtn');
-            const loading = document.getElementById('loadingIndicator');
-            const resultArea = document.getElementById('resultArea');
-
-            btn.disabled = true;
-            loading.classList.remove('hidden');
-            resultArea.classList.add('hidden');
-
-            try {
-                let q1 = "Unknown", q2 = "Unknown";
-                for (let i = 0; i < csvDataRows.length; i++) {
-                    if (csvDataRows[i][0] && csvDataRows[i][0].trim() === topic) {
-                        q1 = csvDataRows[i][2] || "Not found";
-                        if (csvDataRows[i+1] && csvDataRows[i+1][2]) {
-                            q2 = csvDataRows[i+1][2];
-                        }
-                        break;
-                    }
-                }
-
-                const genAI = new GoogleGenerativeAI(apiKey);
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-
-                const pdfPart = { inlineData: { data: pdfBase64Data, mimeType: "application/pdf" } };
-                const audio1Part = await fileToGenerativePart(audio1);
-                const audio2Part = await fileToGenerativePart(audio2);
-
-                const prompt = `
-                You are an experienced English teacher in Israel assessing a student's Oral Bagrut Exam (COBE).
-                Student Name: ${studentName} | Level: ${level} Points | Topic: ${topic}
-                
-                Questions asked:
-                Q1: ${q1}
-                Q2: ${q2}
-                
-                Instructions:
-                1. Read the attached PDF for the Part C Rubric for ${level} points.
-                2. Listen to Audio 1 (Answer to Q1) and Audio 2 (Answer to Q2).
-                3. Check if answers are under 30 seconds and apply standard Part C rubric deductions if so.
-                4. Provide a clear summary of the answers, scores for Content, Vocabulary, Accuracy/Language, and Fluency, a Total Score (/100), and 2-3 actionable tips for improvement. Format the output cleanly.
-                `;
-
-                const result = await model.generateContent([prompt, pdfPart, audio1Part, audio2Part]);
-                finalReportText = result.response.text();
-
-                document.getElementById('reportOutput').innerText = finalReportText;
-                resultArea.classList.remove('hidden');
-                
-                // Scroll to results smoothly
-                resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-            } catch (error) {
-                alert("Error generating assessment. Please verify your API key and file formats.");
-                console.error(error);
-            } finally {
-                btn.disabled = false;
-                loading.classList.add('hidden');
-            }
-        });
-
-        // DOWNLOAD LOGIC
-        document.getElementById('downloadBtn').addEventListener('click', () => {
-            const name = document.getElementById('studentName').value.trim() || "Student";
-            const topic = document.getElementById('videoSelect').value || "Topic";
-            const blob = new Blob([finalReportText], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `COBE_Grade_${name}_${topic.replace(/\\s+/g, '_')}.txt`;
-            a.click();
-            URL.revokeObjectURL(url);
-        });
-    </script>
-</body>
-</html>
+        // LEVEL CHANGE LISTENER
+        document.getElementById('level').addEventListener('change', function(e) {
+            populateVideoDropdown
