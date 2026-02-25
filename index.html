@@ -3,244 +3,272 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>COBE Auto-Assessor</title>
+    <title>COBE Teacher Assessment Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6;
-            color: #333;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        h1 { color: #2c3e50; text-align: center; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; }
-        input[type="text"], input[type="password"], select, input[type="file"] {
-            width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;
-        }
-        button {
-            background-color: #3498db; color: white; border: none; padding: 12px 20px;
-            font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%; margin-top: 10px;
-        }
-        button:hover { background-color: #2980b9; }
-        button:disabled { background-color: #95a5a6; cursor: not-allowed; }
-        #downloadBtn { background-color: #27ae60; display: none; }
-        #downloadBtn:hover { background-color: #2ecc71; }
-        .loading { text-align: center; display: none; margin-top: 20px; font-weight: bold; color: #e67e22; }
-        #reportOutput {
-            margin-top: 20px; padding: 15px; background: #ecf0f1; border-left: 5px solid #3498db;
-            white-space: pre-wrap; display: none; border-radius: 4px; line-height: 1.6;
-        }
-        .note { font-size: 0.85em; color: #7f8c8d; }
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .spinner { border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #3b82f6; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body>
+<body class="text-slate-800 p-6 md:p-12">
 
-<div class="container">
-    <h1>COBE Assessment Tool</h1>
-    <p style="text-align: center;">Locally processes audio and rubrics using the Gemini API.</p>
+    <div class="max-w-5xl mx-auto space-y-8">
+        <header class="text-center">
+            <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">COBE Assessment Dashboard</h1>
+            <p class="text-slate-500 mt-2">Automated Bagrut Grading via Gemini AI</p>
+        </header>
 
-    <div class="form-group">
-        <label for="apiKey">Gemini API Key (Required)</label>
-        <input type="password" id="apiKey" placeholder="AIzaSy...">
-        <span class="note">Your key stays in your browser and is not saved to any server.</span>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-xl font-bold mb-4 text-blue-600 border-b pb-2">1. System Setup</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Gemini API Key</label>
+                        <input type="password" id="apiKey" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="AIzaSy...">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Upload Questions (CSV)</label>
+                        <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        <p class="text-xs text-green-600 mt-1 hidden" id="csvSuccess">✓ CSV loaded. Videos populated.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Upload Rubric (PDF)</label>
+                        <input type="file" id="pdfFile" accept=".pdf" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-xl font-bold mb-4 text-blue-600 border-b pb-2">2. Student Files</h2>
+                
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Student Name</label>
+                            <input type="text" id="studentName" class="w-full p-2 border rounded outline-none" placeholder="e.g. Yossi">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Exam Level</label>
+                            <select id="level" class="w-full p-2 border rounded outline-none bg-white">
+                                <option value="4">4 Points (016486)</option>
+                                <option value="5">5 Points (16586)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Video Topic (Select from CSV)</label>
+                        <select id="videoSelect" class="w-full p-2 border rounded outline-none bg-white" disabled>
+                            <option value="">Upload CSV first to load videos...</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Upload Q1 Audio (.webm)</label>
+                        <input type="file" id="audio1" accept="audio/*" class="w-full text-sm">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Upload Q2 Audio (.webm)</label>
+                        <input type="file" id="audio2" accept="audio/*" class="w-full text-sm">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center">
+            <button id="assessBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                Generate Assessment
+            </button>
+            <div id="loadingIndicator" class="hidden flex flex-col items-center justify-center mt-6">
+                <div class="spinner mb-2"></div>
+                <p class="text-slate-600 font-medium">Analyzing audio files and rubric... (approx. 30-45s)</p>
+            </div>
+        </div>
+
+        <div id="resultArea" class="hidden bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex justify-between items-center border-b pb-4 mb-4">
+                <h2 class="text-2xl font-bold text-slate-800">Assessment Report</h2>
+                <button id="downloadBtn" class="bg-emerald-500 hover:bg-emerald-600 text-white py-2 px-4 rounded shadow font-semibold">
+                    ⬇ Download Report
+                </button>
+            </div>
+            <pre id="reportOutput" class="whitespace-pre-wrap font-sans text-slate-700 leading-relaxed"></pre>
+        </div>
+
     </div>
 
-    <div class="form-group">
-        <label for="studentName">Student Name</label>
-        <input type="text" id="studentName" placeholder="e.g., Yossi Cohen">
-    </div>
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+      }
+    </script>
 
-    <div class="form-group">
-        <label for="level">Exam Level</label>
-        <select id="level">
-            <option value="4">4 Points (016486)</option>
-            <option value="5">5 Points (016586)</option>
-        </select>
-    </div>
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
 
-    <div class="form-group">
-        <label for="topic">Video Topic</label>
-        <input type="text" id="topic" placeholder="e.g., Making Snow">
-    </div>
+        let csvDataRows = [];
+        let finalReportText = "";
 
-    <div class="form-group">
-        <label for="audioFile">1. Upload Student Audio (.webm, .mp3, .m4a, .wav)</label>
-        <input type="file" id="audioFile" accept="audio/*">
-    </div>
+        // 1. Process CSV when uploaded to populate dropdown
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
 
-    <div class="form-group">
-        <label for="pdfFile">2. Upload Rubric (PDF)</label>
-        <input type="file" id="pdfFile" accept="application/pdf">
-    </div>
+            Papa.parse(file, {
+                complete: function(results) {
+                    csvDataRows = results.data;
+                    const select = document.getElementById('videoSelect');
+                    select.innerHTML = '<option value="">Select a video...</option>';
+                    
+                    let videosFound = new Set();
 
-    <div class="form-group">
-        <label for="csvFile">3. Upload Questions (CSV)</label>
-        <input type="file" id="csvFile" accept=".csv">
-    </div>
+                    // Loop through CSV to find video names (usually in column 0)
+                    csvDataRows.forEach(row => {
+                        const videoName = row[0] ? row[0].trim() : '';
+                        // Filter out headers or empty lines
+                        if (videoName && videoName !== 'name of video' && videoName !== '016486 (4 points)') {
+                            videosFound.add(videoName);
+                        }
+                    });
 
-    <button id="assessBtn">Assess Student</button>
-    
-    <div class="loading" id="loadingIndicator">
-        Analyzing Audio, CSV, and Rubric... Please wait (this takes about 30-60 seconds)...
-    </div>
+                    videosFound.forEach(vid => {
+                        const opt = document.createElement('option');
+                        opt.value = vid;
+                        opt.innerText = vid;
+                        select.appendChild(opt);
+                    });
 
-    <div id="reportOutput"></div>
-    <button id="downloadBtn">Download Full Report</button>
-
-</div>
-
-<script type="importmap">
-  {
-    "imports": {
-      "@google/generative-ai": "https://esm.run/@google/generative-ai"
-    }
-  }
-</script>
-
-<script type="module">
-  import { GoogleGenerativeAI } from "@google/generative-ai";
-
-  // Helper function to convert a File to Base64 (required for sending to Gemini via browser)
-  function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result.split(',')[1];
-        resolve({
-          inlineData: {
-            data: base64String,
-            mimeType: file.type
-          }
+                    select.disabled = false;
+                    document.getElementById('csvSuccess').classList.remove('hidden');
+                }
+            });
         });
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
 
-  // Helper function to read Text files (like CSV)
-  function readFileAsText(file) {
-      return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsText(file);
-      });
-  }
+        // Helper to convert files for Gemini
+        function fileToGenerativePart(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    resolve({
+                        inlineData: { data: reader.result.split(',')[1], mimeType: file.type }
+                    });
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
 
-  let finalReportText = "";
+        // 2. Main Assessment Logic
+        document.getElementById('assessBtn').addEventListener('click', async () => {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const studentName = document.getElementById('studentName').value.trim() || "Student";
+            const level = document.getElementById('level').value;
+            const topic = document.getElementById('videoSelect').value;
+            
+            const pdfFile = document.getElementById('pdfFile').files[0];
+            const audio1 = document.getElementById('audio1').files[0];
+            const audio2 = document.getElementById('audio2').files[0];
 
-  document.getElementById('assessBtn').addEventListener('click', async () => {
-      const apiKey = document.getElementById('apiKey').value.trim();
-      const studentName = document.getElementById('studentName').value.trim() || "Student";
-      const level = document.getElementById('level').value;
-      const topic = document.getElementById('topic').value.trim();
-      
-      const audioFile = document.getElementById('audioFile').files[0];
-      const pdfFile = document.getElementById('pdfFile').files[0];
-      const csvFile = document.getElementById('csvFile').files[0];
+            if (!apiKey || !topic || !pdfFile || !audio1 || !audio2 || csvDataRows.length === 0) {
+                alert("Please ensure API Key, all 4 files (CSV, PDF, Audio 1, Audio 2), and Video Topic are provided!");
+                return;
+            }
 
-      if (!apiKey || !topic || !audioFile || !pdfFile || !csvFile) {
-          alert("Please fill in all fields and upload all 3 files!");
-          return;
-      }
+            // UI changes while loading
+            const btn = document.getElementById('assessBtn');
+            const loading = document.getElementById('loadingIndicator');
+            const resultArea = document.getElementById('resultArea');
+            const output = document.getElementById('reportOutput');
 
-      const btn = document.getElementById('assessBtn');
-      const loading = document.getElementById('loadingIndicator');
-      const output = document.getElementById('reportOutput');
-      const downloadBtn = document.getElementById('downloadBtn');
+            btn.disabled = true;
+            loading.classList.remove('hidden');
+            resultArea.classList.add('hidden');
 
-      btn.disabled = true;
-      loading.style.display = 'block';
-      output.style.display = 'none';
-      downloadBtn.style.display = 'none';
+            try {
+                // Find Questions in the CSV
+                let q1 = "Unknown Q1", q2 = "Unknown Q2";
+                let foundTopic = false;
+                
+                for (let i = 0; i < csvDataRows.length; i++) {
+                    if (csvDataRows[i][0] && csvDataRows[i][0].trim() === topic) {
+                        q1 = csvDataRows[i][2] || "Not found";
+                        // Q2 is usually on the next line, column 2
+                        if (csvDataRows[i+1] && csvDataRows[i+1][2]) {
+                            q2 = csvDataRows[i+1][2];
+                        }
+                        break;
+                    }
+                }
 
-      try {
-          // Initialize Gemini AI
-          const genAI = new GoogleGenerativeAI(apiKey);
-          // Gemini 1.5 Pro is required for multi-modal (Audio + PDF + Text) reasoning
-          const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-          // Convert files to the required formats
-          const audioPart = await fileToBase64(audioFile);
-          const pdfPart = await fileToBase64(pdfFile);
-          const csvText = await readFileAsText(csvFile);
+                const pdfPart = await fileToGenerativePart(pdfFile);
+                const audio1Part = await fileToGenerativePart(audio1);
+                const audio2Part = await fileToGenerativePart(audio2);
 
-          // Step 3: Prompt Construction (Adding questions dynamically from CSV text)
-          const prompt = `
-          You are an experienced English teacher in Israel assessing a student's Oral Bagrut Exam (COBE).
-          
-          **Student Details:**
-          - Name: ${studentName}
-          - Level: ${level} Points
-          - Video Topic: ${topic}
-          
-          **Instructions for Assessment:**
-          1. **Extract Questions:** First, look at the attached CSV text data. Find the specific row for the ${level}-point level and the topic "${topic}". Extract Question 1 and Question 2 that the student was asked.
-          2. **Listen to Audio:** Listen carefully to the attached audio recording of the student answering those specific questions (Part C).
-          3. **Read the Rubric:** Read the attached official Ministry of Education PDF rubric. Find the specific assessment table for Part C for the ${level}-point level.
-          4. **Assess:** Assess the student's audio response strictly based on that specific table's criteria and weightings.
-          5. **Timing Rule:** The student must speak for a minimum of 30 seconds per answer. Apply appropriate penalties if the answers are too short or if only one question is answered.
-          
-          **Output Format Requirements:**
-          - **Extracted Questions:** Show the two questions you found in the CSV.
-          - **Transcript Summary:** A brief summary of what the student said.
-          - **Criteria Breakdown:** Scores for Content, Vocabulary, Accuracy/Language, and Fluency (out of their respective maximums from the rubric). Provide a 1-sentence justification for each.
-          - **Final Total Score:** /100
-          - **Constructive Feedback:** 2-3 specific tips for the student to improve.
-          
-          Here is the CSV Data containing the questions:
-          \n${csvText}\n
-          `;
+                const prompt = `
+                You are an experienced English teacher in Israel assessing a student's Oral Bagrut Exam (COBE).
+                
+                **Student Details:**
+                - Name: ${studentName}
+                - Level: ${level} Points
+                - Video Topic: ${topic}
+                
+                **Questions the student was asked:**
+                Question 1: ${q1}
+                Question 2: ${q2}
+                
+                **Instructions:**
+                1. Look at the attached PDF for the official Ministry of Education Part C Rubric for ${level} points.
+                2. Listen to Audio File 1 (Student's answer to Question 1).
+                3. Listen to Audio File 2 (Student's answer to Question 2).
+                4. Assess the student based on the official rubric. Remember: answers under 30 seconds require deductions based on the rubric.
+                
+                **Output Format:**
+                - Include a brief summary of what the student said for each question.
+                - Provide specific scores for Content, Vocabulary, Accuracy/Language, and Fluency based exactly on the rubric's point breakdown.
+                - Give a Final Score out of 100.
+                - Provide 2-3 specific points of constructive feedback.
+                `;
 
-          // Call Gemini API with all parts (Prompt, Audio, PDF)
-          const result = await model.generateContent([prompt, audioPart, pdfPart]);
-          const response = await result.response;
-          finalReportText = response.text();
+                const result = await model.generateContent([prompt, pdfPart, audio1Part, audio2Part]);
+                finalReportText = result.response.text();
 
-          // Display Results
-          output.innerText = finalReportText;
-          output.style.display = 'block';
-          downloadBtn.style.display = 'block';
+                output.innerText = finalReportText;
+                resultArea.classList.remove('hidden');
 
-      } catch (error) {
-          console.error(error);
-          alert("An error occurred during assessment. Check the console or your API key.");
-          output.innerText = "Error: " + error.message;
-          output.style.display = 'block';
-      } finally {
-          btn.disabled = false;
-          loading.style.display = 'none';
-      }
-  });
+            } catch (error) {
+                console.error(error);
+                alert("Error: " + error.message + "\n\nMake sure your API key is correct and your files are valid.");
+            } finally {
+                btn.disabled = false;
+                loading.classList.add('hidden');
+            }
+        });
 
-  // Download Report Functionality
-  document.getElementById('downloadBtn').addEventListener('click', () => {
-      const studentName = document.getElementById('studentName').value.trim() || "Student";
-      const blob = new Blob([finalReportText], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
-      a.href = url;
-      // Add timestamp to filename
-      const date = new Date().toISOString().slice(0,10);
-      a.download = `COBE_Report_${studentName}_${date}.txt`;
-      
-      document.body.appendChild(a);
-      a.click();
-      
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-  });
-</script>
-
+        // 3. Download Report
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const studentName = document.getElementById('studentName').value.trim() || "Student";
+            const topic = document.getElementById('videoSelect').value || "Topic";
+            
+            const blob = new Blob([finalReportText], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `COBE_Grade_${studentName}_${topic.replace(/\s+/g, '_')}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    </script>
 </body>
 </html>
