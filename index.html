@@ -41,8 +41,8 @@
             </h1>
             <p class="text-slate-500 text-lg max-w-2xl mx-auto">AI-powered grading for the Israeli Oral Bagrut Exam.</p>
             
-            <div id="systemStatus" class="inline-flex items-center bg-white text-slate-600 px-5 py-2.5 rounded-full text-sm font-medium shadow-sm border border-slate-200 transition-colors duration-300">
-                <div class="spinner mr-3"></div> Loading Rubric...
+            <div id="systemStatus" class="inline-flex items-center bg-emerald-50 text-emerald-700 px-5 py-2.5 rounded-full text-sm font-semibold shadow-sm border border-emerald-200">
+                ✅ System Ready: No external files needed!
             </div>
         </header>
 
@@ -85,7 +85,7 @@
         </div>
 
         <div class="text-center pb-10">
-            <button id="assessBtn" disabled class="bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-heading font-bold text-lg py-4 px-12 rounded-full shadow-xl shadow-brand-500/30 transform transition hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+            <button id="assessBtn" class="bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-heading font-bold text-lg py-4 px-12 rounded-full shadow-xl shadow-brand-500/30 transform transition hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                 Generate AI Assessment
             </button>
             <div id="loadingIndicator" class="hidden flex flex-col items-center justify-center mt-8 bg-white/80 backdrop-blur py-4 px-6 rounded-2xl shadow-sm inline-block mx-auto max-w-sm">
@@ -189,4 +189,173 @@
                     "What does the speaker mean when she says that if you constantly think about your sleep it may cause more sleep problems? Explain. At the end of the clip, the speaker offers a number of suggestions. Which do you find the most useful? Explain."
                 ],
                 "The Power of Words": [
-                    "At the beginning of the clip, the speaker makes claims that are not true. What makes people believe him?
+                    "At the beginning of the clip, the speaker makes claims that are not true. What makes people believe him? What does the speaker mean when he says, 'A simple choice of words can make a difference'. Explain.",
+                    "According to the clip, how does the speaker react both times when he sees his son drawing on the wall? Which of his reactions was more effective? Explain."
+                ]
+            }
+        };
+
+        let finalReportText = "";
+        let activeQuestions = [];
+
+        function populateVideoDropdown(selectedLevel) {
+            const select = document.getElementById('videoSelect');
+            select.innerHTML = '<option value="">Select a video...</option>'; 
+            
+            const topics = Object.keys(EXAM_DATA[selectedLevel] || {});
+            topics.forEach(vid => {
+                const opt = document.createElement('option');
+                opt.value = vid;
+                opt.innerText = vid;
+                select.appendChild(opt);
+            });
+            
+            document.getElementById('dynamicUploads').innerHTML = `<div class="col-span-full text-center p-6 bg-slate-50 border border-slate-200 border-dashed rounded-xl text-slate-500">Please select a video topic.</div>`;
+            activeQuestions = [];
+        }
+
+        document.getElementById('level').addEventListener('change', function(e) {
+            populateVideoDropdown(e.target.value);
+        });
+
+        document.getElementById('videoSelect').addEventListener('change', function(e) {
+            const topic = e.target.value;
+            const level = document.getElementById('level').value;
+            const container = document.getElementById('dynamicUploads');
+            
+            if (!topic) {
+                container.innerHTML = `<div class="col-span-full text-center p-6 bg-slate-50 border border-slate-200 border-dashed rounded-xl text-slate-500">Please select a video topic.</div>`;
+                activeQuestions = [];
+                return;
+            }
+
+            activeQuestions = EXAM_DATA[level][topic] || [];
+            container.innerHTML = '';
+            
+            activeQuestions.forEach((qText, index) => {
+                const qNum = index + 1;
+                const html = `
+                    <div class="space-y-3 flex flex-col">
+                        <div class="bg-brand-50 p-4 rounded-xl border border-brand-100 flex-grow shadow-sm">
+                            <span class="text-brand-600 font-bold block mb-1">Question ${qNum}:</span>
+                            <span class="text-slate-700 text-sm leading-relaxed">${qText}</span>
+                        </div>
+                        <label id="dropzone${qNum}" class="upload-zone flex flex-col items-center justify-center w-full h-32 border-2 border-brand-200 border-dashed rounded-2xl cursor-pointer bg-slate-50">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                                <svg class="w-8 h-8 text-brand-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                                <p class="text-sm font-semibold text-slate-700" id="label${qNum}">Upload Q${qNum} Audio</p>
+                                <p class="text-xs text-slate-500 mt-1">(.webm / .mp3)</p>
+                            </div>
+                            <input type="file" id="audio${qNum}" accept="audio/*" class="hidden" onchange="window.updateFileName('audio${qNum}', 'dropzone${qNum}', 'label${qNum}', 'Upload Q${qNum} Audio')">
+                        </label>
+                    </div>
+                `;
+                container.innerHTML += html;
+            });
+        });
+
+        // Initialize UI immediately without waiting for downloads
+        window.addEventListener('DOMContentLoaded', () => {
+            populateVideoDropdown('4'); 
+        });
+
+        function fileToGenerativePart(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve({ inlineData: { data: reader.result.split(',')[1], mimeType: file.type } });
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // MAIN AI LOGIC
+        document.getElementById('assessBtn').addEventListener('click', async () => {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const studentName = document.getElementById('studentName').value.trim() || "Student";
+            const level = document.getElementById('level').value;
+            const topic = document.getElementById('videoSelect').value;
+
+            if (!apiKey || activeQuestions.length === 0) {
+                alert("Please provide your API Key and select a video topic.");
+                return;
+            }
+
+            let uploadedAudioParts = [];
+            for (let i = 0; i < activeQuestions.length; i++) {
+                const audioInput = document.getElementById(`audio${i+1}`);
+                if (!audioInput || !audioInput.files[0]) {
+                    alert(`Please upload the audio file for Question ${i+1}.`);
+                    return;
+                }
+                const part = await fileToGenerativePart(audioInput.files[0]);
+                uploadedAudioParts.push(part);
+            }
+
+            const btn = document.getElementById('assessBtn');
+            const loading = document.getElementById('loadingIndicator');
+            const resultArea = document.getElementById('resultArea');
+
+            btn.disabled = true;
+            loading.classList.remove('hidden');
+            resultArea.classList.add('hidden');
+
+            try {
+                let questionsPromptString = "";
+                activeQuestions.forEach((qText, index) => {
+                    questionsPromptString += `\nQuestion ${index + 1}: ${qText}`;
+                });
+
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+                
+                // Embed the rubric logic directly into the AI Prompt
+                const rubricDetails = level === '4' 
+                    ? "Topic Development (60%), Vocabulary (20%), Accuracy/Language (10%), Fluency/Delivery (10%)." 
+                    : "Topic Development (50%), Vocabulary (20%), Accuracy/Language (15%), Fluency/Delivery (15%).";
+
+                const prompt = `
+                You are an experienced English teacher in Israel assessing a student's Oral Bagrut Exam (COBE).
+                Student Name: ${studentName} | Level: ${level} Points | Topic: ${topic}
+                
+                The student was asked the following ${activeQuestions.length} questions (Part C):
+                ${questionsPromptString}
+                
+                Instructions:
+                1. Listen to the attached Audio files. (Audio 1 = Question 1, Audio 2 = Question 2, etc.)
+                2. Assess the student based on the official Ministry of Education weighting for ${level} points: ${rubricDetails}
+                3. Check the length of the answers. A standard Part C answer should be developed (minimum 30 seconds). If it is significantly shorter, reflect this in the Topic Development score.
+                4. Provide a clear summary of the student's answers, specific scores for each of the 4 criteria out of their respective maximums, a Total Score (/100), and 2-3 actionable tips for improvement. Format the output cleanly.
+                `;
+
+                // Only send the text prompt and audio to Gemini (No PDF required!)
+                const result = await model.generateContent([prompt, ...uploadedAudioParts]);
+                finalReportText = result.response.text();
+
+                document.getElementById('reportOutput').innerText = finalReportText;
+                resultArea.classList.remove('hidden');
+                resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            } catch (error) {
+                alert("Error generating assessment. Please verify your API key.");
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+                loading.classList.add('hidden');
+            }
+        });
+
+        // DOWNLOAD LOGIC
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const name = document.getElementById('studentName').value.trim() || "Student";
+            const topic = document.getElementById('videoSelect').value || "Topic";
+            const blob = new Blob([finalReportText], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `COBE_Grade_${name}_${topic.replace(/\s+/g, '_')}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
