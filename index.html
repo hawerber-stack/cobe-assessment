@@ -118,6 +118,7 @@
     </script>
 
     <script>
+        // Global UI function 
         window.updateFileName = function(inputId, dropzoneId, labelId, defaultText) {
             const input = document.getElementById(inputId);
             const dropzone = document.getElementById(dropzoneId);
@@ -254,10 +255,8 @@
             });
         });
 
-        // Initialize UI immediately without waiting for downloads
-        window.addEventListener('DOMContentLoaded', () => {
-            populateVideoDropdown('4'); 
-        });
+        // FIXED: Immediately populate the dropdown! No waiting for DOMContentLoaded
+        populateVideoDropdown(document.getElementById('level').value || '4');
 
         function fileToGenerativePart(file) {
             return new Promise((resolve, reject) => {
@@ -327,7 +326,7 @@
                 4. Provide a clear summary of the student's answers, specific scores for each of the 4 criteria out of their respective maximums, a Total Score (/100), and 2-3 actionable tips for improvement. Format the output cleanly.
                 `;
 
-                // Only send the text prompt and audio to Gemini (No PDF required!)
+                // Send the prompt and audio to Gemini
                 const result = await model.generateContent([prompt, ...uploadedAudioParts]);
                 finalReportText = result.response.text();
 
