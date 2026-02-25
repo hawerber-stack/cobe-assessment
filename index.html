@@ -6,98 +6,135 @@
     <title>COBE Teacher Assessment Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        heading: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-        .spinner { border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #3b82f6; animation: spin 1s linear infinite; }
+        body { background-color: #f3f4f6; background-image: radial-gradient(#e5e7eb 1px, transparent 1px); background-size: 20px 20px; }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .spinner { border: 3px solid rgba(99, 102, 241, 0.2); width: 20px; height: 20px; border-radius: 50%; border-left-color: #4f46e5; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
+        .spinner-large { width: 40px; height: 40px; border-width: 4px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Custom Audio Upload Dropzones */
+        .upload-zone { transition: all 0.3s ease; }
+        .upload-zone:hover { border-color: #4f46e5; background-color: #eef2ff; transform: translateY(-2px); }
+        .upload-zone.has-file { border-color: #10b981; background-color: #ecfdf5; border-style: solid; }
     </style>
 </head>
-<body class="text-slate-800 p-6 md:p-12">
+<body class="text-slate-700 min-h-screen py-10 px-4 sm:px-6 lg:px-8 font-sans">
 
-    <div class="max-w-5xl mx-auto space-y-8">
-        <header class="text-center">
-            <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">COBE Assessment Dashboard</h1>
-            <p class="text-slate-500 mt-2">Automated Bagrut Grading via Gemini AI</p>
+    <div class="max-w-4xl mx-auto space-y-8">
+        <header class="text-center space-y-4">
+            <div class="inline-flex items-center justify-center p-3 bg-brand-100 rounded-2xl mb-2 shadow-sm">
+                <svg class="w-8 h-8 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+            </div>
+            <h1 class="text-4xl md:text-5xl font-heading font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-400 tracking-tight">
+                COBE Auto-Assessor
+            </h1>
+            <p class="text-slate-500 text-lg max-w-2xl mx-auto">AI-powered grading for the Israeli Oral Bagrut Exam.</p>
+            
+            <div id="systemStatus" class="inline-flex items-center bg-white text-slate-600 px-5 py-2.5 rounded-full text-sm font-medium shadow-sm border border-slate-200 transition-colors duration-300">
+                <div class="spinner mr-3"></div> Loading Rubric & Questions from server...
+            </div>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="glass-card p-8 md:p-10 rounded-3xl shadow-xl border border-white/50 relative overflow-hidden">
+            <div class="absolute -top-24 -right-24 w-48 h-48 bg-brand-100 rounded-full mix-blend-multiply filter blur-2xl opacity-70"></div>
             
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h2 class="text-xl font-bold mb-4 text-blue-600 border-b pb-2">1. System Setup</h2>
+            <div class="space-y-8 relative z-10">
                 
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-semibold mb-1">Gemini API Key</label>
-                        <input type="password" id="apiKey" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="AIzaSy...">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold mb-1">Upload Questions (CSV)</label>
-                        <input type="file" id="csvFile" accept=".csv" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                        <p class="text-xs text-green-600 mt-1 hidden" id="csvSuccess">✓ CSV loaded. Videos populated.</p>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold mb-1">Upload Rubric (PDF)</label>
-                        <input type="file" id="pdfFile" accept=".pdf" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                    </div>
+                <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2 font-heading">🔑 Gemini API Key</label>
+                    <input type="password" id="apiKey" class="w-full p-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 outline-none transition-all" placeholder="Paste your AIzaSy... key here">
                 </div>
-            </div>
 
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h2 class="text-xl font-bold mb-4 text-blue-600 border-b pb-2">2. Student Files</h2>
-                
-                <div class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Student Name</label>
-                            <input type="text" id="studentName" class="w-full p-2 border rounded outline-none" placeholder="e.g. Yossi">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Exam Level</label>
-                            <select id="level" class="w-full p-2 border rounded outline-none bg-white">
-                                <option value="4">4 Points (016486)</option>
-                                <option value="5">5 Points (16586)</option>
-                            </select>
-                        </div>
-                    </div>
-
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label class="block text-sm font-semibold mb-1">Video Topic (Select from CSV)</label>
-                        <select id="videoSelect" class="w-full p-2 border rounded outline-none bg-white" disabled>
-                            <option value="">Upload CSV first to load videos...</option>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2 font-heading">👤 Student Name</label>
+                        <input type="text" id="studentName" class="w-full p-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 outline-none transition-all" placeholder="e.g. Yossi Cohen">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2 font-heading">⭐ Exam Level</label>
+                        <select id="level" class="w-full p-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 outline-none transition-all appearance-none cursor-pointer">
+                            <option value="4">4 Points (016486)</option>
+                            <option value="5">5 Points (16586)</option>
                         </select>
                     </div>
+                </div>
 
-                    <div>
-                        <label class="block text-sm font-semibold mb-1">Upload Q1 Audio (.webm)</label>
-                        <input type="file" id="audio1" accept="audio/*" class="w-full text-sm">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-semibold mb-1">Upload Q2 Audio (.webm)</label>
-                        <input type="file" id="audio2" accept="audio/*" class="w-full text-sm">
-                    </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2 font-heading">📺 Video Topic</label>
+                    <select id="videoSelect" class="w-full p-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-100 cursor-pointer" disabled>
+                        <option value="">Waiting for questions to load...</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                    <label id="dropzone1" class="upload-zone flex flex-col items-center justify-center w-full h-36 border-2 border-brand-200 border-dashed rounded-2xl cursor-pointer bg-slate-50">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                            <svg class="w-8 h-8 text-brand-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                            <p class="text-sm font-semibold text-slate-700" id="label1">Upload Q1 Audio</p>
+                            <p class="text-xs text-slate-500 mt-1">Click to browse (.webm)</p>
+                        </div>
+                        <input type="file" id="audio1" accept="audio/*" class="hidden" onchange="updateFileName('audio1', 'dropzone1', 'label1', 'Q1 Audio')">
+                    </label>
+
+                    <label id="dropzone2" class="upload-zone flex flex-col items-center justify-center w-full h-36 border-2 border-brand-200 border-dashed rounded-2xl cursor-pointer bg-slate-50">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                            <svg class="w-8 h-8 text-brand-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                            <p class="text-sm font-semibold text-slate-700" id="label2">Upload Q2 Audio</p>
+                            <p class="text-xs text-slate-500 mt-1">Click to browse (.webm)</p>
+                        </div>
+                        <input type="file" id="audio2" accept="audio/*" class="hidden" onchange="updateFileName('audio2', 'dropzone2', 'label2', 'Q2 Audio')">
+                    </label>
                 </div>
             </div>
         </div>
 
-        <div class="text-center">
-            <button id="assessBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                Generate Assessment
+        <div class="text-center pb-10">
+            <button id="assessBtn" disabled class="bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-heading font-bold text-lg py-4 px-12 rounded-full shadow-xl shadow-brand-500/30 transform transition hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                Generate AI Assessment
             </button>
-            <div id="loadingIndicator" class="hidden flex flex-col items-center justify-center mt-6">
-                <div class="spinner mb-2"></div>
-                <p class="text-slate-600 font-medium">Analyzing audio files and rubric... (approx. 30-45s)</p>
+            <div id="loadingIndicator" class="hidden flex flex-col items-center justify-center mt-8 bg-white/80 backdrop-blur py-4 px-6 rounded-2xl shadow-sm inline-block mx-auto max-w-sm">
+                <div class="spinner spinner-large mb-3"></div>
+                <p class="text-brand-900 font-semibold font-heading">AI is listening to the audio...</p>
+                <p class="text-slate-500 text-sm mt-1">Cross-referencing rubrics (approx. 30s)</p>
             </div>
         </div>
 
-        <div id="resultArea" class="hidden bg-white p-8 rounded-xl shadow-sm border border-slate-200">
-            <div class="flex justify-between items-center border-b pb-4 mb-4">
-                <h2 class="text-2xl font-bold text-slate-800">Assessment Report</h2>
-                <button id="downloadBtn" class="bg-emerald-500 hover:bg-emerald-600 text-white py-2 px-4 rounded shadow font-semibold">
-                    ⬇ Download Report
+        <div id="resultArea" class="hidden glass-card p-8 md:p-10 rounded-3xl shadow-xl border-t-8 border-brand-500 mb-20">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 pb-5 mb-6 gap-4">
+                <h2 class="text-2xl font-heading font-bold text-slate-800">Official Report Card</h2>
+                <button id="downloadBtn" class="flex items-center gap-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 py-2.5 px-5 rounded-full font-semibold transition-colors duration-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Download .txt
                 </button>
             </div>
-            <pre id="reportOutput" class="whitespace-pre-wrap font-sans text-slate-700 leading-relaxed"></pre>
+            <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                <pre id="reportOutput" class="whitespace-pre-wrap font-sans text-slate-700 text-[15px] leading-relaxed"></pre>
+            </div>
         </div>
 
     </div>
@@ -110,96 +147,121 @@
       }
     </script>
 
+    <script>
+        // UI Function to update the file dropzones when a file is selected
+        function updateFileName(inputId, dropzoneId, labelId, defaultText) {
+            const input = document.getElementById(inputId);
+            const dropzone = document.getElementById(dropzoneId);
+            const label = document.getElementById(labelId);
+            
+            if (input.files && input.files.length > 0) {
+                dropzone.classList.add('has-file');
+                label.innerHTML = `✅ ${input.files[0].name}`;
+                label.classList.replace('text-slate-700', 'text-emerald-700');
+            } else {
+                dropzone.classList.remove('has-file');
+                label.innerHTML = defaultText;
+                label.classList.replace('text-emerald-700', 'text-slate-700');
+            }
+        }
+    </script>
+
     <script type="module">
         import { GoogleGenerativeAI } from "@google/generative-ai";
 
         let csvDataRows = [];
+        let pdfBase64Data = "";
         let finalReportText = "";
 
-        // 1. Process CSV when uploaded to populate dropdown
-        document.getElementById('csvFile').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
+        // AUTO-LOAD FILES FROM GITHUB SERVER
+        window.addEventListener('DOMContentLoaded', async () => {
+            const statusDiv = document.getElementById('systemStatus');
+            try {
+                const csvResponse = await fetch('questions.csv');
+                if (!csvResponse.ok) throw new Error("Could not find questions.csv");
+                const csvText = await csvResponse.text();
+                
+                Papa.parse(csvText, {
+                    complete: function(results) {
+                        csvDataRows = results.data;
+                        const select = document.getElementById('videoSelect');
+                        select.innerHTML = '';
+                        let videosFound = new Set();
 
-            Papa.parse(file, {
-                complete: function(results) {
-                    csvDataRows = results.data;
-                    const select = document.getElementById('videoSelect');
-                    select.innerHTML = '<option value="">Select a video...</option>';
+                        csvDataRows.forEach(row => {
+                            const videoName = row[0] ? row[0].trim() : '';
+                            if (videoName && videoName !== 'name of video' && videoName !== '016486 (4 points)') {
+                                videosFound.add(videoName);
+                            }
+                        });
+
+                        videosFound.forEach(vid => {
+                            const opt = document.createElement('option');
+                            opt.value = vid;
+                            opt.innerText = vid;
+                            select.appendChild(opt);
+                        });
+                        select.disabled = false;
+                    }
+                });
+
+                const pdfResponse = await fetch('rubric.pdf');
+                if (!pdfResponse.ok) throw new Error("Could not find rubric.pdf");
+                const pdfBlob = await pdfResponse.blob();
+                
+                const reader = new FileReader();
+                reader.readAsDataURL(pdfBlob);
+                reader.onloadend = () => {
+                    pdfBase64Data = reader.result.split(',')[1];
                     
-                    let videosFound = new Set();
+                    statusDiv.className = "inline-flex items-center bg-emerald-50 text-emerald-700 px-5 py-2.5 rounded-full text-sm font-semibold shadow-sm border border-emerald-200 transition-colors duration-300";
+                    statusDiv.innerHTML = "✅ System Ready: Rubric & Questions Loaded";
+                    document.getElementById('assessBtn').disabled = false;
+                };
 
-                    // Loop through CSV to find video names (usually in column 0)
-                    csvDataRows.forEach(row => {
-                        const videoName = row[0] ? row[0].trim() : '';
-                        // Filter out headers or empty lines
-                        if (videoName && videoName !== 'name of video' && videoName !== '016486 (4 points)') {
-                            videosFound.add(videoName);
-                        }
-                    });
-
-                    videosFound.forEach(vid => {
-                        const opt = document.createElement('option');
-                        opt.value = vid;
-                        opt.innerText = vid;
-                        select.appendChild(opt);
-                    });
-
-                    select.disabled = false;
-                    document.getElementById('csvSuccess').classList.remove('hidden');
-                }
-            });
+            } catch (error) {
+                console.error(error);
+                statusDiv.className = "inline-flex items-center bg-red-50 text-red-700 px-5 py-2.5 rounded-full text-sm font-semibold shadow-sm border border-red-200 transition-colors duration-300";
+                statusDiv.innerHTML = "❌ Error: Could not load background files from server.";
+            }
         });
 
-        // Helper to convert files for Gemini
         function fileToGenerativePart(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                reader.onloadend = () => {
-                    resolve({
-                        inlineData: { data: reader.result.split(',')[1], mimeType: file.type }
-                    });
-                };
+                reader.onloadend = () => resolve({ inlineData: { data: reader.result.split(',')[1], mimeType: file.type } });
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
             });
         }
 
-        // 2. Main Assessment Logic
+        // MAIN AI LOGIC
         document.getElementById('assessBtn').addEventListener('click', async () => {
             const apiKey = document.getElementById('apiKey').value.trim();
             const studentName = document.getElementById('studentName').value.trim() || "Student";
             const level = document.getElementById('level').value;
             const topic = document.getElementById('videoSelect').value;
-            
-            const pdfFile = document.getElementById('pdfFile').files[0];
             const audio1 = document.getElementById('audio1').files[0];
             const audio2 = document.getElementById('audio2').files[0];
 
-            if (!apiKey || !topic || !pdfFile || !audio1 || !audio2 || csvDataRows.length === 0) {
-                alert("Please ensure API Key, all 4 files (CSV, PDF, Audio 1, Audio 2), and Video Topic are provided!");
+            if (!apiKey || !audio1 || !audio2) {
+                alert("Please provide your API Key and upload both student audio files.");
                 return;
             }
 
-            // UI changes while loading
             const btn = document.getElementById('assessBtn');
             const loading = document.getElementById('loadingIndicator');
             const resultArea = document.getElementById('resultArea');
-            const output = document.getElementById('reportOutput');
 
             btn.disabled = true;
             loading.classList.remove('hidden');
             resultArea.classList.add('hidden');
 
             try {
-                // Find Questions in the CSV
-                let q1 = "Unknown Q1", q2 = "Unknown Q2";
-                let foundTopic = false;
-                
+                let q1 = "Unknown", q2 = "Unknown";
                 for (let i = 0; i < csvDataRows.length; i++) {
                     if (csvDataRows[i][0] && csvDataRows[i][0].trim() === topic) {
                         q1 = csvDataRows[i][2] || "Not found";
-                        // Q2 is usually on the next line, column 2
                         if (csvDataRows[i+1] && csvDataRows[i+1][2]) {
                             q2 = csvDataRows[i+1][2];
                         }
@@ -210,63 +272,53 @@
                 const genAI = new GoogleGenerativeAI(apiKey);
                 const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-                const pdfPart = await fileToGenerativePart(pdfFile);
+                const pdfPart = { inlineData: { data: pdfBase64Data, mimeType: "application/pdf" } };
                 const audio1Part = await fileToGenerativePart(audio1);
                 const audio2Part = await fileToGenerativePart(audio2);
 
                 const prompt = `
                 You are an experienced English teacher in Israel assessing a student's Oral Bagrut Exam (COBE).
+                Student Name: ${studentName} | Level: ${level} Points | Topic: ${topic}
                 
-                **Student Details:**
-                - Name: ${studentName}
-                - Level: ${level} Points
-                - Video Topic: ${topic}
+                Questions asked:
+                Q1: ${q1}
+                Q2: ${q2}
                 
-                **Questions the student was asked:**
-                Question 1: ${q1}
-                Question 2: ${q2}
-                
-                **Instructions:**
-                1. Look at the attached PDF for the official Ministry of Education Part C Rubric for ${level} points.
-                2. Listen to Audio File 1 (Student's answer to Question 1).
-                3. Listen to Audio File 2 (Student's answer to Question 2).
-                4. Assess the student based on the official rubric. Remember: answers under 30 seconds require deductions based on the rubric.
-                
-                **Output Format:**
-                - Include a brief summary of what the student said for each question.
-                - Provide specific scores for Content, Vocabulary, Accuracy/Language, and Fluency based exactly on the rubric's point breakdown.
-                - Give a Final Score out of 100.
-                - Provide 2-3 specific points of constructive feedback.
+                Instructions:
+                1. Read the attached PDF for the Part C Rubric for ${level} points.
+                2. Listen to Audio 1 (Answer to Q1) and Audio 2 (Answer to Q2).
+                3. Check if answers are under 30 seconds and apply standard Part C rubric deductions if so.
+                4. Provide a clear summary of the answers, scores for Content, Vocabulary, Accuracy/Language, and Fluency, a Total Score (/100), and 2-3 actionable tips for improvement. Format the output cleanly.
                 `;
 
                 const result = await model.generateContent([prompt, pdfPart, audio1Part, audio2Part]);
                 finalReportText = result.response.text();
 
-                output.innerText = finalReportText;
+                document.getElementById('reportOutput').innerText = finalReportText;
                 resultArea.classList.remove('hidden');
+                
+                // Scroll to results smoothly
+                resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
             } catch (error) {
+                alert("Error generating assessment. Please verify your API key and file formats.");
                 console.error(error);
-                alert("Error: " + error.message + "\n\nMake sure your API key is correct and your files are valid.");
             } finally {
                 btn.disabled = false;
                 loading.classList.add('hidden');
             }
         });
 
-        // 3. Download Report
+        // DOWNLOAD LOGIC
         document.getElementById('downloadBtn').addEventListener('click', () => {
-            const studentName = document.getElementById('studentName').value.trim() || "Student";
+            const name = document.getElementById('studentName').value.trim() || "Student";
             const topic = document.getElementById('videoSelect').value || "Topic";
-            
             const blob = new Blob([finalReportText], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `COBE_Grade_${studentName}_${topic.replace(/\s+/g, '_')}.txt`;
-            document.body.appendChild(a);
+            a.download = `COBE_Grade_${name}_${topic.replace(/\\s+/g, '_')}.txt`;
             a.click();
-            document.body.removeChild(a);
             URL.revokeObjectURL(url);
         });
     </script>
