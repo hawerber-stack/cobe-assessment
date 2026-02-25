@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>COBE Teacher Assessment Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;700;800&display=swap" rel="stylesheet">
     
     <script>
@@ -25,8 +24,6 @@
         .spinner { border: 3px solid rgba(99, 102, 241, 0.2); width: 20px; height: 20px; border-radius: 50%; border-left-color: #4f46e5; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
         .spinner-large { width: 40px; height: 40px; border-width: 4px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* Custom Audio Upload Dropzones */
         .upload-zone { transition: all 0.3s ease; }
         .upload-zone:hover { border-color: #4f46e5; background-color: #eef2ff; transform: translateY(-2px); }
         .upload-zone.has-file { border-color: #10b981; background-color: #ecfdf5; border-style: solid; }
@@ -45,7 +42,7 @@
             <p class="text-slate-500 text-lg max-w-2xl mx-auto">AI-powered grading for the Israeli Oral Bagrut Exam.</p>
             
             <div id="systemStatus" class="inline-flex items-center bg-white text-slate-600 px-5 py-2.5 rounded-full text-sm font-medium shadow-sm border border-slate-200 transition-colors duration-300">
-                <div class="spinner mr-3"></div> Loading Rubric & Questions from server...
+                <div class="spinner mr-3"></div> Loading Rubric...
             </div>
         </header>
 
@@ -53,7 +50,6 @@
             <div class="absolute -top-24 -right-24 w-48 h-48 bg-brand-100 rounded-full mix-blend-multiply filter blur-2xl opacity-70"></div>
             
             <div class="space-y-8 relative z-10">
-                
                 <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100">
                     <label class="block text-sm font-semibold text-slate-700 mb-2 font-heading">🔑 Gemini API Key</label>
                     <input type="password" id="apiKey" class="w-full p-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 outline-none transition-all" placeholder="Paste your AIzaSy... key here">
@@ -75,9 +71,8 @@
 
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-2 font-heading">📺 Video Topic</label>
-                    <select id="videoSelect" class="w-full p-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 outline-none transition-all disabled:opacity-50 disabled:bg-slate-100 cursor-pointer" disabled>
-                        <option value="">Waiting for questions to load...</option>
-                    </select>
+                    <select id="videoSelect" class="w-full p-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 outline-none transition-all cursor-pointer">
+                        </select>
                 </div>
 
                 <div id="dynamicUploads" class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
@@ -112,7 +107,6 @@
                 <pre id="reportOutput" class="whitespace-pre-wrap font-sans text-slate-700 text-[15px] leading-relaxed"></pre>
             </div>
         </div>
-
     </div>
 
     <script type="importmap">
@@ -124,12 +118,10 @@
     </script>
 
     <script>
-        // Global UI Function for handling custom file upload styling
         window.updateFileName = function(inputId, dropzoneId, labelId, defaultText) {
             const input = document.getElementById(inputId);
             const dropzone = document.getElementById(dropzoneId);
             const label = document.getElementById(labelId);
-            
             if (input.files && input.files.length > 0) {
                 dropzone.classList.add('has-file');
                 label.innerHTML = `✅ ${input.files[0].name}`;
@@ -145,30 +137,56 @@
     <script type="module">
         import { GoogleGenerativeAI } from "@google/generative-ai";
 
-        let csvDataRows = [];
-        let pdfBase64Data = "";
-        let finalReportText = "";
-        let videosByLevel = { '4': new Set(), '5': new Set() };
-        let activeQuestions = [];
-
-        // Helper: Populate Video Dropdown based on Level
-        function populateVideoDropdown(selectedLevel) {
-            const select = document.getElementById('videoSelect');
-            select.innerHTML = '<option value="">Select a video...</option>'; 
-            
-            const videosForLevel = videosByLevel[selectedLevel] || new Set();
-            videosForLevel.forEach(vid => {
-                const opt = document.createElement('option');
-                opt.value = vid;
-                opt.innerText = vid;
-                select.appendChild(opt);
-            });
-            
-            select.disabled = (videosForLevel.size === 0);
-            document.getElementById('dynamicUploads').innerHTML = `<div class="col-span-full text-center p-6 bg-slate-50 border border-slate-200 border-dashed rounded-xl text-slate-500">Please select a video topic.</div>`;
-            activeQuestions = [];
-        }
-
-        // LEVEL CHANGE LISTENER
-        document.getElementById('level').addEventListener('change', function(e) {
-            populateVideoDropdown
+        // ==========================================
+        // EMBEDDED EXCEL/CSV DATA
+        // ==========================================
+        const EXAM_DATA = {
+            "4": {
+                "Galapagos Islands": [
+                    "What two facts do we learn about the Galapagos Islands? What do we know about the Galapagos penguins? Name two things.",
+                    "According to the clip, what is 'adaptation'? Explain. How have the iguanas adapted to the Galapagos Islands? Explain."
+                ],
+                "Rainforests": [
+                    "Name three facts we learn about rainforests. What is deforestation? Explain.",
+                    "Why was Kids Saving The Rainforest organization founded? Give two reasons. What have the people in this organization done? Give two examples and explain."
+                ],
+                "Making Snow": [
+                    "What is the problem presented in the clip? According to the clip, what is the solution for this? Explain.",
+                    "Can this machine be used anywhere? Explain. In your opinion, is the solution presented in the clip effective? Give an example and explain."
+                ],
+                "Lifeguard Dogs": [
+                    "What do we know about Beacon and Bouy (Booie)? Name two things. According to the clip, what can a water rescue dog do? Give two examples.",
+                    "Why are Beacon and Bouy so suitable for this job? Explain. Based on the clip you just watched, is it a good idea to have a dog on the lifeguard team? Explain."
+                ],
+                "Dolphins": [
+                    "Name three facts we learn about dolphins. How are dolphins similar to human beings? Give two examples.",
+                    "According to the clip, why is it important to protect our oceans? Explain. What is the most interesting thing you learned from this clip? Explain."
+                ],
+                "Kindness 101: How to Find Empathy": [
+                    "Explain 'empathy' as used in the clip. List two facts about Austin.",
+                    "How did Austin learn about homeless people? Explain. Describe what he does as a result."
+                ]
+            },
+            "5": {
+                "Japan: Kids Walk to School Solo": [
+                    "What is surprising about the young boy's daily routine? Explain. Describe the young boy's journey to school.",
+                    "Why do parents in Japan feel comfortable with this way of life? Give two examples and explain. In your opinion, would parents in Israel be comfortable with this way of life? Explain."
+                ],
+                "The Genius of the London Tube Map": [
+                    "According to the clip, why was the original map of the London Tube complicated? Give two examples and explain. What changes occurred when Harry Beck understood that all that people wanted is to get from one station to the other? Give two examples and explain.",
+                    "How do we know that Beck's Tube map became a success story? Explain. The speaker mentions three principles that should be applied in almost every design problem. Choose one and give an example of how it was applied to the map."
+                ],
+                "How Friendship Affects Your Brain": [
+                    "Why is Priya considered a great friend? Give two examples and explain. What makes adolescent friendships so special? Give two examples and explain.",
+                    "According to the clip, what is 'Theory of Mind'. How does this affect friendships in adolescence? Explain."
+                ],
+                "Pandas": [
+                    "Describe the conservation partnership between China and the United States. According to the clip, what do we learn about pandas? Give two examples.",
+                    "According to the clip, are pandas considered critically endangered? Explain. What is the most interesting thing you learned from this clip? Explain."
+                ],
+                "Do You Really Need 8 Hours of Sleep?": [
+                    "What issue does the speaker raise at the beginning of her talk? According to the clip, is it true that people need 7-8 hours of sleep every night? Explain.",
+                    "What does the speaker mean when she says that if you constantly think about your sleep it may cause more sleep problems? Explain. At the end of the clip, the speaker offers a number of suggestions. Which do you find the most useful? Explain."
+                ],
+                "The Power of Words": [
+                    "At the beginning of the clip, the speaker makes claims that are not true. What makes people believe him?
